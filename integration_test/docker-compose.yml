@@ -1,0 +1,198 @@
+###############################################################################
+# Copyright 2017 Samsung Electronics All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+###############################################################################
+
+## EdgeX Foundry docker compose file    
+
+version: '2'
+services:
+  volume:
+    image: edgexfoundry/docker-edgex-volume
+    container_name: edgex-files
+    networks:
+      - edgex-network
+    volumes:
+      - /data/db
+      - /edgex/logs
+      - /consul/config
+      - /consul/data
+
+  consul:
+    image: edgexfoundry/docker-core-consul
+    ports:
+      - "8400"
+      - "8500"
+      - "8600"
+    container_name: edgex-core-consul
+    hostname: edgex-core-consul
+    networks:
+      - edgex-network
+    volumes_from:
+      - volume
+    depends_on:
+      - volume
+
+  config-seed:
+    image: docker.sec.samsung.net:5000/docker-core-config-seed/x86_64
+    container_name: edgex-config-seed
+    hostname: edgex-core-config-seed
+    networks:
+      - edgex-network
+    volumes_from:
+      - volume
+    depends_on:
+      - volume
+      - consul
+
+  mongo:
+    image: edgexfoundry/docker-edgex-mongo
+    ports:
+      - "27017"
+    container_name: edgex-mongo
+    hostname: edgex-mongo
+    networks:
+      - edgex-network
+    volumes_from:
+      - volume
+    depends_on:
+      - volume
+    command: --smallfiles
+
+  mongo-seed:
+    image: edgexfoundry/docker-edgex-mongo-seed
+    container_name: edgex-mongo-seed
+    hostname: edgex-mongo-seed
+    networks:
+      - edgex-network
+    volumes_from:
+      - volume
+    depends_on:
+      - volume
+      - mongo
+
+  logging:
+    image: edgexfoundry/docker-support-logging
+    ports:
+      - "48061"
+    container_name: edgex-support-logging
+    hostname: edgex-support-logging
+    networks:
+      - edgex-network
+    volumes_from:
+      - volume
+    depends_on:
+      - volume
+      - consul
+      - config-seed
+      - mongo
+      - mongo-seed 
+
+  metadata:
+    image: edgexfoundry/docker-core-metadata
+    ports:
+      - "48081"
+    container_name: edgex-core-metadata
+    hostname: edgex-core-metadata
+    networks:
+      - edgex-network
+    volumes_from:
+      - volume
+    depends_on:
+      - volume
+      - consul
+      - config-seed
+      - mongo
+      - mongo-seed
+      - logging
+
+  data:
+    image: edgexfoundry/docker-core-data
+    ports:
+      - "48080"
+      - "5563"
+    container_name: edgex-core-data
+    hostname: edgex-core-data
+    networks:
+      - edgex-network
+    volumes_from:
+      - volume
+    depends_on:
+      - volume
+      - consul
+      - config-seed
+      - mongo
+      - mongo-seed
+      - logging
+
+  command:
+    image: edgexfoundry/docker-core-command
+    ports:
+      - "48082"
+    container_name: edgex-core-command
+    hostname: edgex-core-command
+    networks:
+      - edgex-network
+    volumes_from:
+      - volume
+    depends_on:
+      - volume
+      - consul
+      - config-seed
+      - mongo
+      - mongo-seed
+      - logging
+      - metadata
+
+  device-opcua-java:
+    image: target-project
+    ports:
+      - "49997"      
+    container_name: device-opcua-java
+    hostname: device-opcua-java
+    networks:
+      - edgex-network
+    volumes_from:
+      - volume
+    depends_on:
+      - volume
+      - metadata
+      - data
+      - command
+      - consul
+
+  edgex-core-test-tool:
+    image: docker.sec.samsung.net:5000/edgex-core-test-tool/x86_64
+    ports:
+      - "49113"
+    container_name: edgex-core-test-tool
+    hostname: edgex-core-test-tool
+    stdin_open: true
+    networks:
+      - edgex-network
+    volumes_from:
+      - volume
+    depends_on:
+      - volume
+      - metadata
+      - data
+      - command
+      - consul
+
+networks:
+  edgex-network:
+    driver: "bridge"
+... 
+
